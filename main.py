@@ -272,9 +272,14 @@ def admin_page() -> FT:
 
 
 poll_styles = Style("""
+main.container:has(.brand-image) {
+    display: flex;
+    flex-direction: column;
+}
 .brand-image {
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 2rem;
+    order: -1;
 }
 .brand-image img {
     max-width: min(100%, 480px);
@@ -349,8 +354,8 @@ async def index(sess):
     ]
     return Titled(
         quiz_name,
+        brand_image(),
         Container(
-            brand_image(),
             Div(hx_ext="ws", ws_connect="/ws")(*panels),
         ),
     )
