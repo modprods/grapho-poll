@@ -2,7 +2,7 @@
 
 ## Context
 
-FastHTML app managed by uv. Pulls multiple questions and answers from a Neo4j db via a CYPHER query string in .env, renders a tile grid of thumbnail buttons for each possible answer. Pressing a button sends the image ID over a websocket connection to a TouchDesigner installation on the LAN.
+FastHTML app managed by uv. Pulls multiple questions and answers from a Neo4j db via a CYPHER query string in .env, renders a tile grid of thumbnail buttons for each possible answer. Pressing a button sends the answer as a websocket message
 
 Stack: python-fasthtml, httpx, websockets, pytest. Python >=3.12. Managed by uv.
 
