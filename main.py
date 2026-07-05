@@ -287,6 +287,32 @@ poll_styles = Style("""
     color: var(--pico-primary-inverse, #fff);
     border-color: var(--pico-primary, #0172ad);
 }
+@media (prefers-color-scheme: light) {
+    .answer-buttons .uk-btn.answer-btn {
+        background-color: #f6f8fa;
+        color: #24292f;
+        border: 2px solid #d0d7de;
+    }
+    .answer-buttons .uk-btn.answer-btn.selected {
+        background-color: #0969da;
+        color: #ffffff;
+        border-color: #0550ae;
+        box-shadow: inset 0 0 0 1px #0550ae;
+        font-weight: 600;
+    }
+}
+:root[data-theme="light"] .answer-buttons .uk-btn.answer-btn {
+    background-color: #f6f8fa;
+    color: #24292f;
+    border: 2px solid #d0d7de;
+}
+:root[data-theme="light"] .answer-buttons .uk-btn.answer-btn.selected {
+    background-color: #0969da;
+    color: #ffffff;
+    border-color: #0550ae;
+    box-shadow: inset 0 0 0 1px #0550ae;
+    font-weight: 600;
+}
 .stats-row--top.stats-row--correct td { background: #e8f5e9; }
 .stats-row--top.stats-row--wrong td { background: #ffebee; }
 .admin-nav { margin-bottom: 1.5rem; }
