@@ -1,4 +1,9 @@
-Audience remote to procedural art installation powered by TouchDesigner
+# grapho-poll
 
-The app presents a set of buttons - one for each image artifact in the collection and sends a message to spawn these in the installation
+Michela Ledwidge
 
+Simple poll UI for presenter working with graph databases
+
+Configure a CYPHER query to pull multiple choice questions (and optional correct answers) from Neo4j and construct a simple poll UI. 
+
+The admin page provides real-time responses 
