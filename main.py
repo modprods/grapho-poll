@@ -452,12 +452,17 @@ async def startup() -> None:
     await load_quiz_data()
 
 
+async def shutdown() -> None:
+    mod_telemetry.shutdown()
+
+
 os.makedirs("data", exist_ok=True)
 
 app, rt = fast_app(
     exts="ws",
     hdrs=(poll_styles,),
     on_startup=[startup],
+    on_shutdown=[shutdown],
 )
 
 db = database(DB_FILE)
