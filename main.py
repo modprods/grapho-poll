@@ -11,6 +11,8 @@ from monsterui.franken import Button, Card, CardBody, CardHeader, Container
 from neo4j import AsyncGraphDatabase
 from neo4j.exceptions import Neo4jError
 
+import mod_telemetry
+
 load_dotenv()
 
 ERROR_LOG_FILE = "error.log"
@@ -37,6 +39,15 @@ def configure_logging(log_level: str = LOG_LEVEL, error_log_path: str = ERROR_LO
 
 configure_logging()
 log = logging.getLogger(__name__)
+
+SERVICE_NAME = "grapho-poll"
+SERVICE_VERSION = "0.1.0"
+_meter = mod_telemetry.init(SERVICE_NAME, SERVICE_VERSION)
+answers_posted = _meter.create_counter(
+    "answers.posted",
+    unit="1",
+    description="Number of answers posted",
+)
 
 WS_PING_INTERVAL = 15  # seconds
 DB_FILE = "data/poll.db"
@@ -129,8 +140,8 @@ async def fetch_quiz_from_neo4j() -> list[dict[str, Any]]:
             async with driver.session(database=NEO4J_DATABASE) as session:
                 result = await session.run(QUIZ_CYPHER_QUERY)
                 return await result.data()
-    except Neo4jError as exc:
-        log.error("Neo4j query failed: %s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
+    except Neo4jError:
+        log.exception("Neo4j query failed")
         return []
 
 
@@ -475,7 +486,11 @@ async def index(sess):
 async def ws(question: str, answer: str, sess):
     session_id = get_session_id(sess)
     save_answer(session_id, question, answer)
-    log.info("session=%s question=%r answer=%r", session_id, question, answer)
+    answers_posted.add(1, {"channel": "web"})
+    log.info(
+        "answer posted",
+        extra={"session": session_id, "question": question, "answer": answer},
+    )
     await broadcast_admin_update(question)
     selected = get_user_answers(session_id)
     for i, record in enumerate(quiz_questions):

@@ -123,7 +123,14 @@ Add .env LOG_LEVEL = DEBUG
 
 ### Feature 5: OTel telemetry
 
-Good — with Grafana Cloud you can skip the collector entirely for now and send OTLP straight from the app. That's the "Quickstart" path, and it's the right call while you're getting your first signals flowing; you can slot a collector/Alloy in front later without touching app code. The Quickstart guide configures instrumentation to send OTLP data directly to the Grafana Cloud OTLP endpoint, without setting up a data pipeline with an OpenTelemetry Collector.
+Instrument the app to send telemetry to Grafana Cloud
+
+* errors - e.g. database query error
+* answer_post - e.g. answer posted from main page
+
+Use the following instructions as a guide
+
+With Grafana Cloud you can skip the collector entirely for now and send OTLP straight from the app. That's the "Quickstart" path, and it's the right call while you're getting your first signals flowing; you can slot a collector/Alloy in front later without touching app code. The Quickstart guide configures instrumentation to send OTLP data directly to the Grafana Cloud OTLP endpoint, without setting up a data pipeline with an OpenTelemetry Collector.
 
 ## 1. Grab your OTLP credentials
 
@@ -204,7 +211,7 @@ The `LoggingHandler` above already routes anything through Python's stdlib `logg
 
 ```python
 import logging
-log = logging.getLogger("moreoptimism")
+log = logging.getLogger("grapho-poll")
 
 try:
     result = do_the_thing()
@@ -212,7 +219,7 @@ except Exception:
     log.exception("answer submission failed")   # ERROR + stack trace -> Loki
 ```
 
-`log.exception(...)` captures the traceback automatically. In Grafana you'll query these in Loki with something like `{service_name="moreoptimism"} | level="ERROR"`. If you also turn on Starlette auto-instrumentation (below), unhandled exceptions in request handlers get recorded on the trace span too, so you can jump from an error log to the exact failing request.
+`log.exception(...)` captures the traceback automatically. In Grafana you'll query these in Loki with something like `{service_name="grapho-poll"} | level="ERROR"`. If you also turn on Starlette auto-instrumentation (below), unhandled exceptions in request handlers get recorded on the trace span too, so you can jump from an error log to the exact failing request.
 
 ## 5. "Answers posted"
 
@@ -220,7 +227,7 @@ This is a business event, best modeled as a **counter** you increment each time 
 
 ```python
 import mod_telemetry
-meter = mod_telemetry.init("moreoptimism", "1.2.0")
+meter = mod_telemetry.init("grapho-poll", "0.0.1")
 
 answers_posted = meter.create_counter(
     "answers.posted",
@@ -243,7 +250,7 @@ The counter gives you the dashboardable metric (`answers.posted` → a time seri
 Wrap your run command and you also get request spans/traces for every FastHTML route for free, with no code changes:
 
 ```bash
-OTEL_SERVICE_NAME=moreoptimism opentelemetry-instrument uvicorn app:app
+OTEL_SERVICE_NAME=grapho-poll opentelemetry-instrument uvicorn app:app
 ```
 
 If you go this route, drop the tracing setup from the module and let auto-instrumentation own it — your custom counter and logs still work alongside it since they share the same OTLP env vars.
@@ -252,7 +259,7 @@ If you go this route, drop the tracing setup from the module and let auto-instru
 
 In Grafana Cloud: **Explore** → pick the Loki data source and query your service for the error logs; pick the Mimir/Prometheus data source and search for `answers_posted_total` (the counter gets a `_total` suffix on the Prometheus side). Once both show up, you've got the full loop.
 
-One thing worth deciding now rather than later: put `mod_telemetry.init()` behind an env check (`MOD_ENV`) so local dev doesn't ship telemetry to your Grafana Cloud quota — that free tier is generous but the gallery load tests could chew through it fast if pointed at the cloud endpoint. That's also the natural seam where a local collector slots in later.
+One thing worth deciding now rather than later: put `mod_telemetry.init()` behind an env check (`MOD_ENV`) so local dev doesn't ship telemetry to your Grafana Cloud quota — that free tier is generous but the load tests could chew through it fast if pointed at the cloud endpoint. That's also the natural seam where a local collector slots in later.
 
 Want me to write the `mod_telemetry` module out as an actual file with the env-gating and a `noop` fallback baked in, so it's drop-in for the other apps?
 
