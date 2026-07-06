@@ -101,6 +101,7 @@ def sanitize_otlp_endpoint() -> str:
 
 
 def init(service_name: str, version: str = "0.0.0") -> Meter:
+    logging.getLogger("opentelemetry").propagate = False
     global _meter, _log_provider, _meter_provider
     if not telemetry_enabled():
         log.info(
