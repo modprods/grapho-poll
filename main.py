@@ -322,6 +322,24 @@ main.container:has(.brand-image) {
 }
 .stats-row--top.stats-row--correct td { background: #e8f5e9; }
 .stats-row--top.stats-row--wrong td { background: #ffebee; }
+@media (prefers-color-scheme: dark) {
+    .stats-row--top.stats-row--correct td {
+        background: #14532d;
+        box-shadow: inset 3px 0 0 #4ade80;
+    }
+    .stats-row--top.stats-row--wrong td {
+        background: #7f1d1d;
+        box-shadow: inset 3px 0 0 #f87171;
+    }
+}
+:root[data-theme="dark"] .stats-row--top.stats-row--correct td {
+    background: #14532d;
+    box-shadow: inset 3px 0 0 #4ade80;
+}
+:root[data-theme="dark"] .stats-row--top.stats-row--wrong td {
+    background: #7f1d1d;
+    box-shadow: inset 3px 0 0 #f87171;
+}
 .admin-nav { margin-bottom: 1.5rem; }
 .admin-actions { margin-top: 2rem; }
 .stats-table { width: 100%; }
