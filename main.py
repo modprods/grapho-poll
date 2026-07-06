@@ -13,12 +13,38 @@ from neo4j.exceptions import Neo4jError
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
+ERROR_LOG_FILE = "error.log"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+
+def configure_logging(log_level: str = LOG_LEVEL, error_log_path: str = ERROR_LOG_FILE) -> None:
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s:%(name)s:%(message)s")
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.setLevel(level)
+
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    console.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    root.addHandler(console)
+
+    error_file = logging.FileHandler(error_log_path, encoding="utf-8")
+    error_file.setLevel(logging.ERROR)
+    error_file.setFormatter(formatter)
+    root.addHandler(error_file)
+
+
+configure_logging()
 log = logging.getLogger(__name__)
 
 WS_PING_INTERVAL = 15  # seconds
 DB_FILE = "data/poll.db"
-BRAND_IMAGE_URL = "https://docs.grapho.app/img/graphobymod-black.png"
+BRAND_IMAGE_LIGHT_URL = "https://docs.grapho.app/img/graphobymod-black.png"
+BRAND_IMAGE_DARK_URL = (
+    "https://raw.githubusercontent.com/modprods/grapho-user-guide/"
+    "afafc1bf4a337c83c60468cc462a6e9fb533e880/nbs/img/graphobymod-white.png"
+)
 NEO4J_URI = os.getenv("NEO4J_URI", "")
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
 NEO4J_USER = os.getenv("NEO4J_USER", "")
@@ -28,6 +54,7 @@ QUIZ_CACHED_QUERY = os.getenv("QUIZ_CACHED_QUERY", "").strip()
 
 quiz_name: str = ""
 quiz_questions: list[dict[str, Any]] = []
+admin_senders: dict[Any, Any] = {}
 
 
 class PollResponse:
@@ -103,7 +130,7 @@ async def fetch_quiz_from_neo4j() -> list[dict[str, Any]]:
                 result = await session.run(QUIZ_CYPHER_QUERY)
                 return await result.data()
     except Neo4jError as exc:
-        log.error("Neo4j query failed: %s", exc)
+        log.error("Neo4j query failed: %s", exc, exc_info=log.isEnabledFor(logging.DEBUG))
         return []
 
 
@@ -145,7 +172,8 @@ def save_answer(session_id: str, question: str, answer: str) -> None:
 
 def brand_image() -> FT:
     return Div(
-        Img(src=BRAND_IMAGE_URL, alt="grapho by MOD"),
+        Img(src=BRAND_IMAGE_LIGHT_URL, alt="grapho by MOD", cls="brand-image-light"),
+        Img(src=BRAND_IMAGE_DARK_URL, alt="grapho by MOD", cls="brand-image-dark"),
         cls="brand-image",
     )
 
@@ -234,8 +262,17 @@ def stat_row_class(highlight: str | None) -> str:
     return "stats-row"
 
 
-def admin_question_panel(record: dict[str, Any]) -> FT:
+def admin_question_panel_id(index: int) -> str:
+    return f"admin-question-{index}"
+
+
+def percent_column_header(total: int) -> str:
+    return f"% (of {total})"
+
+
+def admin_question_panel(record: dict[str, Any], index: int, oob: bool = False) -> FT:
     stats = answer_stats(record)
+    total = sum(stat["count"] for stat in stats)
     rows = [
         Tr(
             Td(stat["answer"]),
@@ -244,11 +281,14 @@ def admin_question_panel(record: dict[str, Any]) -> FT:
         )
         for stat in stats
     ]
-    return Card(cls="question-panel")(
+    card_kw: dict[str, Any] = {"id": admin_question_panel_id(index), "cls": "question-panel"}
+    if oob:
+        card_kw["hx_swap_oob"] = "true"
+    return Card(**card_kw)(
         CardHeader(H3(record["question"])),
         CardBody(
             Table(
-                Thead(Tr(Th("Answer"), Th("%"))),
+                Thead(Tr(Th("Answer"), Th(percent_column_header(total)))),
                 Tbody(*rows),
                 cls="stats-table",
             ),
@@ -256,13 +296,53 @@ def admin_question_panel(record: dict[str, Any]) -> FT:
     )
 
 
+async def broadcast_admin_panel(record: dict[str, Any], index: int) -> None:
+    if not admin_senders:
+        return
+    panel = admin_question_panel(record, index, oob=True)
+    dead: list[Any] = []
+    for client, send in admin_senders.items():
+        try:
+            await send(panel)
+        except Exception as exc:
+            log.debug("Admin websocket client disconnected: %s", exc)
+            dead.append(client)
+    for client in dead:
+        admin_senders.pop(client, None)
+
+
+async def broadcast_admin_update(question: str) -> None:
+    for i, record in enumerate(quiz_questions):
+        if record["question"] == question:
+            await broadcast_admin_panel(record, i)
+            return
+
+
+async def broadcast_all_admin_panels() -> None:
+    for i, record in enumerate(quiz_questions):
+        await broadcast_admin_panel(record, i)
+
+
+async def admin_ws_connect(scope, send) -> None:
+    admin_senders[scope.client] = send
+    log.debug("Admin websocket connected: %s", scope.client)
+
+
+async def admin_ws_disconnect(scope) -> None:
+    admin_senders.pop(scope.client, None)
+    log.debug("Admin websocket disconnected: %s", scope.client)
+
+
 def admin_page() -> FT:
-    panels = [admin_question_panel(record) for record in quiz_questions]
+    panels = [
+        admin_question_panel(record, i)
+        for i, record in enumerate(quiz_questions)
+    ]
     return Titled(
         f"{quiz_name} — Results",
         Container(
             P(A("← Poll", href="/"), cls="admin-nav"),
-            *panels,
+            Div(hx_ext="ws", ws_connect="/admin/ws")(*panels),
             Div(
                 Form(method="post", action="/admin/clear")(
                     Button("Clear all responses", cls="clear-btn", type="submit"),
@@ -287,6 +367,15 @@ main.container:has(.brand-image) {
     max-width: min(100%, 480px);
     height: auto;
 }
+.brand-image-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+    .brand-image-light { display: none; }
+    .brand-image-dark { display: block; }
+}
+:root[data-theme="dark"] .brand-image-light { display: none; }
+:root[data-theme="dark"] .brand-image-dark { display: block; }
+:root[data-theme="light"] .brand-image-light { display: block; }
+:root[data-theme="light"] .brand-image-dark { display: none; }
 .question-panel { margin-bottom: 1.5rem; }
 .answer-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .answer-btn.selected {
@@ -342,7 +431,8 @@ main.container:has(.brand-image) {
 }
 .admin-nav { margin-bottom: 1.5rem; }
 .admin-actions { margin-top: 2rem; }
-.stats-table { width: 100%; }
+.stats-table { width: 100%; table-layout: fixed; }
+.stats-table th, .stats-table td { width: 50%; }
 """)
 
 
@@ -386,10 +476,16 @@ async def ws(question: str, answer: str, sess):
     session_id = get_session_id(sess)
     save_answer(session_id, question, answer)
     log.info("session=%s question=%r answer=%r", session_id, question, answer)
+    await broadcast_admin_update(question)
     selected = get_user_answers(session_id)
     for i, record in enumerate(quiz_questions):
         if record["question"] == question:
             return question_panel(i, record, selected)
+    return ""
+
+
+@app.ws("/admin/ws", conn=admin_ws_connect, disconn=admin_ws_disconnect)
+async def admin_ws():
     return ""
 
 
@@ -401,6 +497,7 @@ async def admin():
 @rt("/admin/clear", methods=["POST"])
 async def admin_clear():
     clear_all_responses()
+    await broadcast_all_admin_panels()
     log.info("Cleared all poll responses")
     return RedirectResponse("/admin", status_code=303)
 
