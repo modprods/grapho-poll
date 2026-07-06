@@ -76,6 +76,8 @@ def save_quiz_to_cache(path: str, records: list[dict[str, Any]]) -> None:
 
 
 def question_choices(record: dict[str, Any]) -> list[str]:
+    if record.get("all_answers"):
+        return [answer for answer in record["all_answers"] if answer]
     choices: list[str] = []
     correct = record.get("correct_choice")
     if correct:
