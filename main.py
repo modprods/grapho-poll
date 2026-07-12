@@ -187,11 +187,12 @@ def save_answer(session_id: str, question: str, answer: str) -> None:
 
 
 def brand_image() -> FT:
-    return Div(
+    images = (
         Img(src=BRAND_IMAGE_LIGHT_URL, alt="grapho by MOD", cls="brand-image-light"),
         Img(src=BRAND_IMAGE_DARK_URL, alt="grapho by MOD", cls="brand-image-dark"),
-        cls="brand-image",
     )
+    content: FT = A(*images, href=POLL_CTA, target="_blank") if POLL_CTA else Div(*images)
+    return Div(content, cls="brand-image")
 
 
 def poll_source_footer() -> FT | None:
@@ -379,6 +380,7 @@ def admin_page() -> FT:
     ]
     return Titled(
         f"{POLL_TITLE} ADMIN",
+        brand_image(),
         Container(
             P(A("← Poll", href="/"), cls="admin-nav"),
             Div(hx_ext="ws", ws_connect="/admin/ws")(*panels),
@@ -401,6 +403,10 @@ main.container:has(.brand-image) {
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 2rem;
     order: -1;
+}
+.brand-image a {
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
 }
 .brand-image img {
     max-width: min(60%, 480px);
