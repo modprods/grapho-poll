@@ -51,11 +51,18 @@ answers_posted = _meter.create_counter(
 
 WS_PING_INTERVAL = 15  # seconds
 DB_FILE = "data/poll.db"
-BRAND_IMAGE_LIGHT_URL = "https://docs.grapho.app/img/graphobymod-black.png"
-BRAND_IMAGE_DARK_URL = (
-    "https://raw.githubusercontent.com/modprods/grapho-user-guide/"
-    "afafc1bf4a337c83c60468cc462a6e9fb533e880/nbs/img/graphobymod-white.png"
+BRAND_IMAGE_LIGHT_URL = os.getenv(
+    "BRAND_IMAGE_LIGHT_URL",
+    "https://docs.grapho.app/img/graphobymod-black.png",
 )
+BRAND_IMAGE_DARK_URL = os.getenv(
+    "BRAND_IMAGE_DARK_URL",
+    "https://raw.githubusercontent.com/modprods/grapho-user-guide/"
+    "afafc1bf4a337c83c60468cc462a6e9fb533e880/nbs/img/graphobymod-white.png",
+)
+POLL_TITLE = os.getenv("POLL_TITLE", "S2026 - Avian Influenza poll")
+POLL_SOURCE = os.getenv("POLL_SOURCE", "").strip()
+POLL_CTA = os.getenv("POLL_CTA", "").strip()
 NEO4J_URI = os.getenv("NEO4J_URI", "")
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
 NEO4J_USER = os.getenv("NEO4J_USER", "")
@@ -63,7 +70,6 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 QUIZ_CYPHER_QUERY = os.getenv("QUIZ_CYPHER_QUERY", "").strip()
 QUIZ_CACHED_QUERY = os.getenv("QUIZ_CACHED_QUERY", "").strip()
 
-quiz_name: str = ""
 quiz_questions: list[dict[str, Any]] = []
 admin_senders: dict[Any, Any] = {}
 
@@ -146,7 +152,7 @@ async def fetch_quiz_from_neo4j() -> list[dict[str, Any]]:
 
 
 async def load_quiz_data() -> None:
-    global quiz_name, quiz_questions
+    global quiz_questions
     if QUIZ_CACHED_QUERY:
         cached = load_quiz_from_cache(QUIZ_CACHED_QUERY)
         if cached is not None:
@@ -159,7 +165,6 @@ async def load_quiz_data() -> None:
     else:
         quiz_questions = await fetch_quiz_from_neo4j()
         log.info("Loaded %d questions from Neo4j", len(quiz_questions))
-    quiz_name = quiz_questions[0]["quiz"] if quiz_questions else "Quiz"
 
 
 def get_session_id(sess: dict[str, Any]) -> str:
@@ -187,6 +192,29 @@ def brand_image() -> FT:
         Img(src=BRAND_IMAGE_DARK_URL, alt="grapho by MOD", cls="brand-image-dark"),
         cls="brand-image",
     )
+
+
+def poll_source_footer() -> FT | None:
+    if not POLL_SOURCE:
+        return None
+    return P(
+        A("View source on GitHub", href=POLL_SOURCE, target="_blank"),
+        cls="poll-footer",
+    )
+
+
+def poll_cta_footer() -> FT | None:
+    if not POLL_CTA:
+        return None
+    return P(
+        "For more information - ",
+        A(POLL_CTA, href=POLL_CTA, target="_blank"),
+        cls="poll-footer",
+    )
+
+
+def poll_page_footers() -> list[FT]:
+    return [footer for footer in (poll_cta_footer(), poll_source_footer()) if footer]
 
 
 def question_panel_id(index: int) -> str:
@@ -350,7 +378,7 @@ def admin_page() -> FT:
         for i, record in enumerate(quiz_questions)
     ]
     return Titled(
-        f"{quiz_name} — Results",
+        f"{POLL_TITLE} ADMIN",
         Container(
             P(A("← Poll", href="/"), cls="admin-nav"),
             Div(hx_ext="ws", ws_connect="/admin/ws")(*panels),
@@ -375,7 +403,7 @@ main.container:has(.brand-image) {
     order: -1;
 }
 .brand-image img {
-    max-width: min(100%, 480px);
+    max-width: min(60%, 480px);
     height: auto;
 }
 .brand-image-dark { display: none; }
@@ -442,6 +470,7 @@ main.container:has(.brand-image) {
 }
 .admin-nav { margin-bottom: 1.5rem; }
 .admin-actions { margin-top: 2rem; }
+.poll-footer { margin-top: 2rem; text-align: center; }
 .stats-table { width: 100%; table-layout: fixed; }
 .stats-table th, .stats-table td { width: 50%; }
 """)
@@ -479,10 +508,11 @@ async def index(sess):
         for i, record in enumerate(quiz_questions)
     ]
     return Titled(
-        quiz_name,
+        POLL_TITLE,
         brand_image(),
         Container(
             Div(hx_ext="ws", ws_connect="/ws")(*panels),
+            *poll_page_footers(),
         ),
     )
 
