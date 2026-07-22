@@ -1,6 +1,6 @@
 # grapho-poll
 
-Simple poll UI for presentations referencing property graph data.
+Simple poll UI for presentations referencing property graph data (e.g. via [Grapho toolkit](https://grapho.app)).
 
 No limits based on IP. Session handling via browser cookie. 
 
