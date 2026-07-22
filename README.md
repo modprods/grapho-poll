@@ -93,15 +93,15 @@ stdout_logfile_maxbytes=10MB
 
 To enable telemetry in your production pipeline, set these in .env
 
-{{{
+```
 MOD_ENV=<prod | staging | dev>
 OTEL_TELEMETRY_ENABLED=<true | false>
-}}}
+````
 
 Tested on Grafana Cloud as metrics, logs and traces
 
-{{{
+```
 Loki: {service_name="grapho-poll"} |= "answer posted"
 Mimir: answers_posted_total
-}}}
+```
 
