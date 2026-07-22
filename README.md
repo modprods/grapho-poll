@@ -1,8 +1,12 @@
 # grapho-poll
 
-Michela Ledwidge
+Simple poll UI for presentations referencing property graph data.
 
-Simple poll UI for presenter working with graph databases
+No limits based on IP. Session handling via browser cookie. 
+
+No limits on changing answer. 
+
+[FastHtml](https://www.fastht.ml/) modern web tooling for fast developer iteration and response times.
 
 The admin page provides real-time responses and the means to clear the results.
 
